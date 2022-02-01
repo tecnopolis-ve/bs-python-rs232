@@ -18,6 +18,9 @@ player_turn = False
 matrix_local_player = None
 matrix_remote_player = None
 match_ready = False
+refresh_board = False
+maximum_hit = 0
+total_hit = 0
 w, h = 10, 10
 
 
@@ -59,7 +62,7 @@ def init(port):
 
 def read_port():
 
-    global remote_player_name, player_turn, match_ready
+    global remote_player_name, player_turn, match_ready, refresh_board, total_hit
 
     while True:
 
@@ -81,13 +84,20 @@ def read_port():
                     elif code == "X002":
                         res = check_play(data, matrix_local_player)
                         if res:
+                            process_play(data, matrix_local_player)
                             write_port("X003:" + data)
+                            refresh_board = True
                             player_turn = False
+                            total_hit += 1
                         else:
+                            process_play(data, matrix_local_player, 8)
                             write_port("X004:" + data)
+                            refresh_board = True
                             player_turn = True
                     elif code == "X003":
+                        process_play(data, matrix_remote_player)
                         player_turn = True
+                        total_hit += 1
                     elif code == "X004":
                         player_turn = False
 
@@ -123,9 +133,11 @@ def check_play(coord, matrix):
     return False
 
 
-def process_play(coord, matrix):
+def process_play(coord, matrix, val = 9):
 
-    return False
+    pos = convert_coordinate(coord)
+
+    matrix[pos[0]][pos[1]] = val
 
 
 def write_port(data):
@@ -148,6 +160,8 @@ def generate_matrix():
 
 def generate_play():
 
+    global maximum_hit
+
     matrix = generate_matrix()
 
     flota = [(4, 1, 4), (3, 3, 3), (2, 3, 2), (1, 2, 1)]
@@ -155,6 +169,7 @@ def generate_play():
     # itero por los tipos de vessels
     for vessels in flota:
         size, quantity, letter = vessels
+        maximum_hit =+ size
         # genero tipo de vessels segun quantity y los coloco en el tablero
         for unidad in range(1, quantity + 1):
             positioned = False
@@ -246,14 +261,15 @@ matrix_remote_player = generate_matrix()
 
 input_data = input("> ")
 
-tleer = threading.Thread(target=read_port, args=())
-tleer.setDaemon(True)
-tleer.start()
+tread_port = threading.Thread(target=read_port, args=())
+tread_port.setDaemon(True)
+tread_port.start()
 
 while True:
     if input_data == "2":
         sys.exit()
     else:
+        refresh_board = False
         clear_console()
         while not num_jugador:
             time.sleep(0.1)
@@ -278,18 +294,24 @@ while True:
                 time.sleep(0.1)
                 pass
         else:
-            if player_turn:
-                invalid_coord = True
-                coord = None
-                while invalid_coord:
-                    coord = input("Indica una coordenada ")
-                    invalid_coord = not check_coordinate(coord)
-
-                if coord:
-                    write_port("X002:" + coord)
-                    player_turn = False
+            if total_hit == maximum_hit:
+                print("FIN DE PARTIDA")
+                sys.exit()
             else:
-                print("Esperando jugada de " + remote_player_name)
-                while not player_turn:
-                    time.sleep(0.1)
-                    pass
+                if player_turn:
+                    invalid_coord = True
+                    coord = None
+                    while invalid_coord:
+                        coord = input("Indica una coordenada ")
+                        invalid_coord = not check_coordinate(coord)
+
+                    if coord:
+                        write_port("X002:" + coord)
+                        player_turn = False
+                else:
+                    print("Esperando jugada de " + remote_player_name)
+                    while not player_turn:
+                        if refresh_board:
+                            break
+                        time.sleep(0.1)
+                        pass
