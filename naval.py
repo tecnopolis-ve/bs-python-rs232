@@ -70,17 +70,17 @@ def read_port():
             if length:
                 x = active_port.read(length).decode("utf-8", errors="ignore")
                 if x:
-                    print ("DEBUG: ", x)
+                    print("DEBUG: ", x)
                     x = x.split(":")
                     code, data = x[0], x[1]
                     if code == "X001":
-                        if(local_player_name and not match_ready):
+                        if local_player_name and not match_ready:
                             write_port("X001:" + local_player_name)
                         remote_player_name = data
                         match_ready = local_player_name and remote_player_name
                     elif code == "X002":
                         res = check_play(data, matrix_local_player)
-                        if (res):
+                        if res:
                             write_port("X003:" + data)
                             player_turn = False
                         else:
@@ -95,16 +95,16 @@ def read_port():
 def convert_coordinate(coord):
 
     letter_to_number = {
-        'a': 0,
-        'b': 1,
-        'c': 2,
-        'd': 3,
-        'e': 4,
-        'f': 5,
-        'g': 6,
-        'h': 7,
-        'i': 8,
-        'j': 9,
+        "a": 0,
+        "b": 1,
+        "c": 2,
+        "d": 3,
+        "e": 4,
+        "f": 5,
+        "g": 6,
+        "h": 7,
+        "i": 8,
+        "j": 9,
     }
 
     letter = coord[0]
@@ -132,7 +132,7 @@ def write_port(data):
 
     data = data + "\r"
     active_port.write(data.encode("utf-8", errors="ignore"))
-    
+
 
 def clear_console():
 
@@ -189,13 +189,13 @@ def generate_play():
 def grid_char(num):
 
     character = {
-        0: '\x1b[0;33;34m' + ' ~ ' + '\x1b[0m',
-        4: '\x1b[1;37;42m' + ' 4 ' + '\x1b[0m',
-        3: '\x1b[0;30;46m' + ' 3 ' + '\x1b[0m',
-        2: '\x1b[2;30;43m' + ' 2 ' + '\x1b[0m',
-        1: '\x1b[0;30;44m' + ' 1 ' + '\x1b[0m',
-        8: ' o ',
-        9: '\x1b[1;31;6m' + ' x ' + '\x1b[0m',
+        0: "\x1b[0;33;34m" + " ~ " + "\x1b[0m",
+        4: "\x1b[1;37;42m" + " 4 " + "\x1b[0m",
+        3: "\x1b[0;30;46m" + " 3 " + "\x1b[0m",
+        2: "\x1b[2;30;43m" + " 2 " + "\x1b[0m",
+        1: "\x1b[0;30;44m" + " 1 " + "\x1b[0m",
+        8: " o ",
+        9: "\x1b[1;31;6m" + " x " + "\x1b[0m",
     }
 
     return character[num]
@@ -272,7 +272,7 @@ while True:
         if remote_player_name:
             print_grid(data=matrix_remote_player, player=remote_player_name)
 
-        if (not match_ready):
+        if not match_ready:
             print("Esperando a que alguien se una a la partida")
             while not remote_player_name:
                 time.sleep(0.1)
@@ -293,4 +293,3 @@ while True:
                 while not player_turn:
                     time.sleep(0.1)
                     pass
-
