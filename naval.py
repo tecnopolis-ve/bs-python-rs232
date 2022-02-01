@@ -4,25 +4,27 @@ import sys
 import os
 import threading
 import random
+import re
 
 BAUDRATE = 9600
-PUERTO1 = "/dev/pts/4"
-PUERTO2 = "/dev/pts/5"
+PUERTO1 = "/dev/pts/5"
+PUERTO2 = "/dev/pts/8"
 
 active_port = None
 num_jugador = None
-nombre_jugador = None
-nombre_jugador_remoto = None
-turno = False
-matrix_jugador = None
-matrix_jugador_remoto = None
+local_player_name = None
+remote_player_name = None
+player_turn = False
+matrix_local_player = None
+matrix_remote_player = None
+match_ready = False
 w, h = 10, 10
 
 
-def conn(puerto):
+def conn(port):
 
     ser = serial.Serial(
-        puerto,
+        port,
         baudrate=BAUDRATE,
         parity=serial.PARITY_NONE,
         stopbits=serial.STOPBITS_ONE,
@@ -33,31 +35,31 @@ def conn(puerto):
     return ser
 
 
-def init(puerto):
+def init(port):
 
-    global active_port, turno
+    global active_port, player_turn
 
-    puertos = {"1": PUERTO1, "2": PUERTO2}
+    ports = {"1": PUERTO1, "2": PUERTO2}
 
     error = False
     print("Iniciando")
 
     try:
-        active_port = conn(puertos[puerto])
+        active_port = conn(ports[port])
     except Exception as e:
         error = True
 
     if error:
-        print("Puerto en uso", puertos[puerto])
+        print("Puerto en uso", ports[port])
     else:
-        if puerto == "1":
-            turno = True
-        print("Conectado", puertos[puerto])
+        if port == "1":
+            player_turn = True
+        print("Conectado", ports[port])
 
 
-def leer():
+def read_port():
 
-    global nombre_jugador_remoto, turno
+    global remote_player_name, player_turn, match_ready
 
     while True:
 
@@ -68,68 +70,118 @@ def leer():
             if length:
                 x = active_port.read(length).decode("utf-8", errors="ignore")
                 if x:
+                    print ("DEBUG: ", x)
                     x = x.split(":")
                     code, data = x[0], x[1]
                     if code == "X001":
-                        nombre_jugador_remoto = data
+                        if(local_player_name and not match_ready):
+                            write_port("X001:" + local_player_name)
+                        remote_player_name = data
+                        match_ready = local_player_name and remote_player_name
                     elif code == "X002":
-                        turno = True
-                        print(data)
+                        res = check_play(data, matrix_local_player)
+                        if (res):
+                            write_port("X003:" + data)
+                            player_turn = False
+                        else:
+                            write_port("X004:" + data)
+                            player_turn = True
+                    elif code == "X003":
+                        player_turn = True
+                    elif code == "X004":
+                        player_turn = False
 
 
-def enviar(data):
+def convert_coordinate(coord):
 
+    letter_to_number = {
+        'a': 0,
+        'b': 1,
+        'c': 2,
+        'd': 3,
+        'e': 4,
+        'f': 5,
+        'g': 6,
+        'h': 7,
+        'i': 8,
+        'j': 9,
+    }
+
+    letter = coord[0]
+    number = coord[1:]
+
+    return (letter_to_number[letter.lower()], int(number))
+
+
+def check_play(coord, matrix):
+
+    pos = convert_coordinate(coord)
+
+    if matrix[pos[0]][pos[1]] > 0:
+        return True
+
+    return False
+
+
+def process_play(coord, matrix):
+
+    return False
+
+
+def write_port(data):
+
+    data = data + "\r"
     active_port.write(data.encode("utf-8", errors="ignore"))
-
+    
 
 def clear_console():
 
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def generar_matrix():
+def generate_matrix():
 
     matrix = [[0 for x in range(w)] for y in range(h)]
 
     return matrix
 
 
-def generar_jugada():
+def generate_play():
 
-    matrix = generar_matrix()
+    matrix = generate_matrix()
 
     flota = [(4, 1, 4), (3, 3, 3), (2, 3, 2), (1, 2, 1)]
 
-    # itero por los tipos de buques
-    for buques in flota:
-        tamano, cantidad, letra = buques
-        # genero tipo de buques segun cantidad y los coloco en el tablero
-        for unidad in range(1, cantidad + 1):
+    # itero por los tipos de vessels
+    for vessels in flota:
+        size, quantity, letter = vessels
+        # genero tipo de vessels segun quantity y los coloco en el tablero
+        for unidad in range(1, quantity + 1):
             positioned = False
             while not positioned:
                 position = bool(random.getrandbits(1))
                 if position:  # vertical
                     relative_pos_x = random.randint(0, w - 1)
-                    relative_pos_y = random.randint(0, h - tamano - 1)
+                    relative_pos_y = random.randint(0, h - size - 1)
                 else:  # horizontal
-                    relative_pos_x = random.randint(0, w - tamano - 1)
+                    relative_pos_x = random.randint(0, w - size - 1)
                     relative_pos_y = random.randint(0, h - 1)
                 check = 0
-                for step in range(0, tamano):
+                for step in range(0, size):
                     if position:  # vertical
                         if matrix[relative_pos_x][relative_pos_y + step] == 0:
                             check = check + 1
                     else:
                         if matrix[relative_pos_x + step][relative_pos_y] == 0:
                             check = check + 1
-                    if check == tamano:
+                    if check == size:
                         positioned = True
                 if positioned:
-                    for step in range(0, tamano):
+                    for step in range(0, size):
                         if position:  # vertical
-                            matrix[relative_pos_x][relative_pos_y + step] = letra
+                            matrix[relative_pos_x][relative_pos_y + step] = letter
                         else:
-                            matrix[relative_pos_x + step][relative_pos_y] = letra
+                            matrix[relative_pos_x + step][relative_pos_y] = letter
 
     return matrix
 
@@ -149,11 +201,19 @@ def grid_char(num):
     return character[num]
 
 
-def pintar_grid(data, player):
+def check_coordinate(coord):
+
+    pattern = r"(^[A-Ja-j]{1}[0-9]{1}$){1}"
+    r = re.compile(pattern)
+    match = r.match(coord)
+
+    return bool(match)
+
+
+def print_grid(data, player):
 
     grid_size = 10
     c = 65
-    character = "~"
 
     # First row
     print()
@@ -161,7 +221,7 @@ def pintar_grid(data, player):
     print(f"{(grid_size*4+4)*'-'}")
     print(f"  ", end="")
     for j in range(grid_size):
-        print(f"| {j+1} ", end="")
+        print(f"| {j} ", end="")
     print(f"| ", end="")
     print()
     print(f"{(grid_size*4+4)*'-'}")
@@ -181,12 +241,12 @@ print("Menú de opciones")
 print("1. Empezar a jugar")
 print("2. Salir")
 
-matrix_jugador = generar_jugada()
-matrix_jugador_remoto = generar_matrix()
+matrix_local_player = generate_play()
+matrix_remote_player = generate_matrix()
 
 input_data = input("> ")
 
-tleer = threading.Thread(target=leer, args=())
+tleer = threading.Thread(target=read_port, args=())
 tleer.setDaemon(True)
 tleer.start()
 
@@ -196,29 +256,41 @@ while True:
     else:
         clear_console()
         while not num_jugador:
+            time.sleep(0.1)
             input_jugador = input("¿Jugador (1) o (2)? ")
             if input_jugador == "1" or input_jugador == "2":
                 num_jugador = input_jugador
                 init(num_jugador)
-                while not nombre_jugador:
-                    nombre_jugador = input("¿Cuál es tu nombre? ")
-                enviar("X001:" + nombre_jugador)
-        if nombre_jugador:
-            pintar_grid(data=matrix_jugador, player=nombre_jugador + " (tú)")
-        if nombre_jugador_remoto:
-            enviar("X001:" + nombre_jugador)
-            pintar_grid(data=matrix_jugador_remoto, player=nombre_jugador_remoto)
-            if turno:
-                coord = input("Indica una coordenada ")
-                enviar("X002:" + coord)
-                turno = False
-            else:
-                print("Esperando jugada de " + nombre_jugador_remoto)
-                while not turno:
-                    time.sleep(0.1)
-                    pass
-        else:
+                while not local_player_name:
+                    local_player_name = input("¿Cuál es tu nombre? ")
+
+                if local_player_name:
+                    write_port("X001:" + local_player_name)
+
+        if local_player_name:
+            print_grid(data=matrix_local_player, player=local_player_name + " (tú)")
+        if remote_player_name:
+            print_grid(data=matrix_remote_player, player=remote_player_name)
+
+        if (not match_ready):
             print("Esperando a que alguien se una a la partida")
-            while not nombre_jugador_remoto:
+            while not remote_player_name:
                 time.sleep(0.1)
                 pass
+        else:
+            if player_turn:
+                invalid_coord = True
+                coord = None
+                while invalid_coord:
+                    coord = input("Indica una coordenada ")
+                    invalid_coord = not check_coordinate(coord)
+
+                if coord:
+                    write_port("X002:" + coord)
+                    player_turn = False
+            else:
+                print("Esperando jugada de " + remote_player_name)
+                while not player_turn:
+                    time.sleep(0.1)
+                    pass
+
