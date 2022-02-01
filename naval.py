@@ -7,11 +7,11 @@ import random
 import re
 
 BAUDRATE = 9600
-PUERTO1 = "/dev/pts/5"
-PUERTO2 = "/dev/pts/8"
+PORT1 = "/dev/pts/5"
+PORT2 = "/dev/pts/8"
 
 active_port = None
-num_jugador = None
+player_number = None
 local_player_name = None
 remote_player_name = None
 player_turn = False
@@ -42,7 +42,7 @@ def init(port):
 
     global active_port, player_turn
 
-    ports = {"1": PUERTO1, "2": PUERTO2}
+    ports = {"1": PORT1, "2": PORT2}
 
     error = False
     print("Iniciando")
@@ -271,12 +271,12 @@ while True:
     else:
         refresh_board = False
         clear_console()
-        while not num_jugador:
+        while not player_number:
             time.sleep(0.1)
             input_jugador = input("¿Jugador (1) o (2)? ")
             if input_jugador == "1" or input_jugador == "2":
-                num_jugador = input_jugador
-                init(num_jugador)
+                player_number = input_jugador
+                init(player_number)
                 while not local_player_name:
                     local_player_name = input("¿Cuál es tu nombre? ")
 
