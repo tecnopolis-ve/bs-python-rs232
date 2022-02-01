@@ -7,8 +7,8 @@ import random
 import re
 
 BAUDRATE = 9600
-PORT1 = "/dev/pts/5"
-PORT2 = "/dev/pts/8"
+PORT1 = "/dev/pts/3"
+PORT2 = "/dev/pts/4"
 
 active_port = None
 player_number = None
@@ -19,7 +19,7 @@ matrix_local_player = None
 matrix_remote_player = None
 match_ready = False
 refresh_board = False
-maximum_hit = 0
+maximum_hit = 21
 total_hit = 0
 w, h = 10, 10
 
@@ -169,7 +169,6 @@ def generate_play():
     # itero por los tipos de vessels
     for vessels in flota:
         size, quantity, letter = vessels
-        maximum_hit =+ size
         # genero tipo de vessels segun quantity y los coloco en el tablero
         for unidad in range(1, quantity + 1):
             positioned = False
